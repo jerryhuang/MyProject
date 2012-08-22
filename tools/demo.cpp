@@ -21,7 +21,7 @@
 */
 //#include "helper.h"
 //#include "mysql_db.h"
-//#include "service.h"
+#include "service.h"
 
 #include <vector>
 #include <string>
@@ -32,21 +32,38 @@
 
 using namespace std;
 
-
-int paser_getbuildid(vector<string> input, vector<string> & output)
+int vector_copy(const vector<string> input, vector<string> & output)
 {
-    for(size_t i=0;i<input.size();i++)
+	output.clear();
+	for(size_t i=0;i<input.size();i++)
 	{
 		output.push_back(input[i]);
 	}
 	return output.size();
 }
 
-int paser_like(vector<string> input, string keyword, vector<string> & output)
+int paser_getbuildid(vector<string> input, vector<string> & output)
 {
 	for(size_t i=0;i<input.size();i++)
 	{
-		output.push_back(input[i] + " REGEXP '" + keyword + "'");
+		size_t pos_dot = input[i].find_first_of(".");
+		output.push_back("0806.2");
+		output.push_back("0816.2");
+		output.push_back("0814.2");
+		output.push_back("0805.2");
+		//output.push_back(input[i]);
+	}
+	return output.size();
+}
+
+int paser_like(vector<string> input, vector<string> keyword, vector<string> & output)
+{
+	for(size_t i=0;i<input.size();i++)
+	{
+		for(size_t j=0;j<keyword.size();j++)
+		{
+			output.push_back(input[i] + " REGEXP '" + keyword[j] + "'");
+		}
 	}
 	return output.size();
 }
@@ -55,7 +72,7 @@ int paser_and(vector<string> input, vector<string> keyword, vector<string> & out
 {
 	for(size_t i=0;i<input.size();i++)
 	{
-		for(size_t j=0;j<input.size();j++)
+		for(size_t j=0;j<keyword.size();j++)
 		{
 			output.push_back(input[i] + " and " + keyword[j]);
 		}
@@ -63,11 +80,14 @@ int paser_and(vector<string> input, vector<string> keyword, vector<string> & out
 	return output.size();
 }
 
-int paser_is(vector<string> input, string keyword, vector<string> & output)
+int paser_is(vector<string> input, vector<string> keyword, vector<string> & output)
 {
 	for(size_t i=0;i<input.size();i++)
 	{
-		output.push_back(input[i] + " = '" + keyword + "'");
+		for(size_t j=0;j<keyword.size();j++)
+		{
+			output.push_back(input[i] + " = '" + keyword[j] + "'");
+		}
 	}
 	return output.size();
 }
@@ -76,86 +96,92 @@ int gen_query_condition(string conditions,vector<string> & querystr)
 {
 	string keycommand,keyvalue;
 	stack<string> function_stack;
-	//stack<string> params_stack;
-	stack<string> value_stack;
+	stack< vector<string> > value_stack;
 	int pos_in = 0;
+	int flag_left = 0;
+	int flag_right = 0;
 	string tempstr;
 	for(size_t i=0;i<conditions.size();i++)
 	{
 		if(conditions[i] == '(')
 		{
-			tempstr = conditions.substr(pos_in,(i - pos_in + 1));
+			tempstr = conditions.substr(pos_in,(i - pos_in));
 			function_stack.push(tempstr);
 			pos_in = i + 1;
+			flag_left = 1;
 		}
 		if(conditions[i] == ',')
 		{
-			//vector<string> value_v;
-			//value_v.push_back(conditions.substr(pos_in,(i - pos_in + 1)));
-			tempstr = conditions.substr(pos_in,(i - pos_in + 1));
-			value_stack.push(tempstr);
+			if (flag_left == 1)
+			{
+				vector<string> value_v;
+				value_v.push_back(conditions.substr(pos_in,(i - pos_in)));
+				value_stack.push(value_v);
+			}
 			pos_in = i + 1;
 		}
 		if(conditions[i] == ')')
 		{
-			//vector<string> value_v;
-			//value_v.push_back(conditions.substr(pos_in,(i - pos_in + 1)));
-			tempstr = conditions.substr(pos_in,(i - pos_in + 1));
-			value_stack.push(tempstr);
+			vector<string> value_v;
+			value_v.push_back(conditions.substr(pos_in,(i - pos_in)));
+			if (i != (flag_right + 1))
+			{
+				vector<string> value_v;
+				value_v.push_back(conditions.substr(pos_in,(i - pos_in)));
+				value_stack.push(value_v);
+			}
 			pos_in = i + 1;
+			flag_left = 0;
+			flag_right = i;
 			string function = function_stack.top();
 			function_stack.pop();
-			string value_getbuildid;
-			string value_right;
-			string value_left;
+			vector<string> value_getbuildid;
+			vector<string> value_right;
+			vector<string> value_left;
 			if (function == "getbuildid")
 			{
-				value_getbuildid = value_stack.top();
+				vector_copy(value_stack.top(),value_getbuildid);
 				value_stack.pop();
 			}else{
-				value_right = value_stack.top();
+				vector_copy(value_stack.top(),value_right);
 				value_stack.pop();
-				value_left = value_stack.top();
+				vector_copy(value_stack.top(),value_left);
 				value_stack.pop();
 			}
 			if (function == "getbuildid") 
 			{
-				vector<string> input,output;
-				input.push_back(value_getbuildid);
-				paser_getbuildid(input,output);
-				value_stack.push(output[0]);
+				vector<string> output;
+				paser_getbuildid(value_getbuildid,output);
+				value_stack.push(output);
 			}
 			if (function == "like")
 			{
-				vector<string> input,output;
-				input.push_back(value_left);
-				string keyword = value_right;
-				paser_like(input,keyword,output);
-				value_stack.push(output[0]);
+				vector<string> output;
+				//cout<<value_left.size()<<endl;
+				//cout<<value_right.size()<<endl;
+				paser_like(value_left,value_right,output);
+				value_stack.push(output);
 			}
 			if (function == "and")
 			{
-				vector<string> input,input_r,output;
-				input.push_back(value_left);
-				input_r.push_back(value_right);
-				paser_and(input,input_r,output);
-				value_stack.push(output[0]);
+				vector<string> output;
+				paser_and(value_left,value_right,output);
+				value_stack.push(output);
 			}
 			if (function == "is")
 			{
-				vector<string> input,output;
-				input.push_back(value_left);
-				string keyword = value_right;
-				paser_is(input,keyword,output);
-				value_stack.push(output[0]);
+				vector<string> output;
+				paser_is(value_left,value_right,output);
+				value_stack.push(output);
 			}
 		}
 	}
-	//vector<string> value_temp = value_stack.top();
-	//for(size_t i=0;i<value_temp.size();i++)
-	//{
-		querystr.push_back(value_stack.top());
-	//}
+	vector<string> value_temp;
+	vector_copy(value_stack.top(),value_temp);
+	for(size_t i=0;i<value_temp.size();i++)
+	{
+		querystr.push_back(value_temp[i]);
+	}
 	return querystr.size();
 }
 
@@ -173,7 +199,7 @@ int query_sql_gen(string Tablename,string DBkeys, string conditions, vector<stri
 
 int main()
 {
-	string conditions = "and(getbuildid(group.subject),is(group.report_flag,1))";
+	string conditions = "and(like(group.subject,getbuildid(group.subject)),is(group.report_flag,1))";
 	vector<string> result;
 	string Tablename = "tzivi";
 	string DBkeys = "subject,project";
